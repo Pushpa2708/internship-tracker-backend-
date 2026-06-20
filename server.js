@@ -1,87 +1,75 @@
+require('dotenv').config();
 const express = require('express');
-const app = express();
-const PORT = 5000;
+const connectDB = require('./config/db');
+const Application = require('./models/Application');
 
-// ---- MIDDLEWARE ----
+const app = express();
+const PORT = process.env.PORT || 5000;
+
 app.use(express.json());
 
-const logger = (req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  next();
-};
-app.use(logger);
-
-// ---- DUMMY DATA (in-memory, resets every time server restarts) ----
-let applications = [
-  { id: 1, company: 'Google', role: 'SDE Intern', status: 'Applied' },
-  { id: 2, company: 'Microsoft', role: 'Backend Intern', status: 'Interview' }
-];
-let nextId = 3;
-
-// ---- ROUTES ----
+connectDB();
 
 // GET all applications
-app.get('/applications', (req, res) => {
-  res.status(200).json(applications);
+app.get('/applications', async (req, res) => {
+  try {
+    const applications = await Application.find();
+    res.status(200).json(applications);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // GET a single application by id
-app.get('/applications/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const found = applications.find(a => a.id === id);
-  if (!found) {
-    return res.status(404).json({ message: 'Application not found' });
+app.get('/applications/:id', async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+    res.status(200).json(application);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
-  res.status(200).json(found);
 });
 
 // POST - create a new application
-app.post('/applications', (req, res) => {
-  const { company, role, status } = req.body;
-
-  if (!company || !role) {
-    return res.status(400).json({ message: 'company and role are required' });
+app.post('/applications', async (req, res) => {
+  try {
+    const newApplication = await Application.create(req.body);
+    res.status(201).json(newApplication);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
-
-  const newApplication = {
-    id: nextId++,
-    company,
-    role,
-    status: status || 'Applied'
-  };
-
-  applications.push(newApplication);
-  res.status(201).json(newApplication);
 });
 
 // PUT - update an existing application
-app.put('/applications/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const found = applications.find(a => a.id === id);
-
-  if (!found) {
-    return res.status(404).json({ message: 'Application not found' });
+app.put('/applications/:id', async (req, res) => {
+  try {
+    const updated = await Application.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!updated) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+    res.status(200).json(updated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
-
-  const { company, role, status } = req.body;
-  if (company !== undefined) found.company = company;
-  if (role !== undefined) found.role = role;
-  if (status !== undefined) found.status = status;
-
-  res.status(200).json(found);
 });
 
 // DELETE - remove an application
-app.delete('/applications/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const index = applications.findIndex(a => a.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: 'Application not found' });
+app.delete('/applications/:id', async (req, res) => {
+  try {
+    const deleted = await Application.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+    res.status(200).json({ message: 'Deleted', application: deleted });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
-
-  const deleted = applications.splice(index, 1);
-  res.status(200).json({ message: 'Deleted', application: deleted[0] });
 });
 
 app.listen(PORT, () => {
