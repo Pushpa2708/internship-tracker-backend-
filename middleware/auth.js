@@ -1,41 +1,21 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const AppError = require('../utils/AppError');
 
 const protect = async (req, res, next) => {
   let token;
-
-  // Check Authorization header for "Bearer <token>"
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     token = req.headers.authorization.split(' ')[1];
   }
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Not authorized - no token provided'
-    });
-  }
+  if (!token) return next(new AppError('Not authorized - no token provided', 401));
 
   try {
-    // Verify signature and expiry - throws if either fails
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Fetch the actual user and attach to req
     req.user = await User.findById(decoded.id);
-
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized - user no longer exists'
-      });
-    }
-
+    if (!req.user) return next(new AppError('Not authorized - user no longer exists', 401));
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token expired, please login again' });
-    }
-    return res.status(401).json({ success: false, message: 'Not authorized - invalid token' });
+    next(err); // TokenExpiredError and JsonWebTokenError now handled by errorHandler
   }
 };
 
