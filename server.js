@@ -24,6 +24,10 @@ app.use('/applications', applicationRoutes);
 // Express identifies error middleware by the 4-param signature (err, req, res, next)
 app.use(errorHandler);
 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
